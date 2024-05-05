@@ -1,0 +1,5 @@
+
+if [ "x$MODULESHOME" != "x" ]; then
+    module use --append /usr/local/share/environment-modules
+fi
+

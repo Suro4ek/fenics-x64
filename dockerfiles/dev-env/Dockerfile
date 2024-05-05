@@ -1,20 +1,39 @@
-# Builds a Docker image with the necessary libraries for compiling
-# FEniCS.  The image is at:
+# Modified from the Dockerimage used by FEniCS:
+# https://bitbucket.org/fenics-project/docker
 #
-#    https://quay.io/repository/fenicsproject/dev-env
 #
-# Authors:
-# Jack S. Hale <jack.hale@uni.lu>
-# Lizao Li <lzlarryli@gmail.com>
-# Garth N. Wells <gnw20@cam.ac.uk>
-# Jan Blechta <blechta@karlin.mff.cuni.cz>
+# Copyright (C) 2013 Columbia University in the City of New York and others.
+#
+# Please see the AUTHORS file in the main source directory for a full list
+# of contributors.
+#
+# This file is part of TerraFERMA.
+#
+# TerraFERMA is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# TerraFERMA is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with TerraFERMA. If not, see <http://www.gnu.org/licenses/>.
+#
+#
+# Builds a Docker image with the correct environment for compiling 
+# TerraFERMA.  The built image can be found at:
+#
+#   https://hub.docker.com/r/terraferma/dev-env
+#
 
-FROM quay.io/fenicsproject/base:latest
-MAINTAINER fenics-project <fenics-support@googlegroups.org>
+# build from the base image
+FROM suro4ek/fenics/base:latest
 
 USER root
 WORKDIR /tmp
-
 # Environment variables
 ENV PETSC_VERSION=3.12.3 \
     SLEPC_VERSION=3.12.1 \
@@ -26,73 +45,56 @@ ENV PETSC_VERSION=3.12.3 \
     OPENBLAS_NUM_THREADS=1 \
     OPENBLAS_VERBOSE=0 \
     FENICS_PREFIX=$FENICS_HOME/local
-
-# Non-Python utilities and libraries
-RUN apt-get -qq update && \
+# install non-python dependencies - splitting these up reduces the size of individual image layers
+RUN apt-get update && \
     apt-get -y --with-new-pkgs \
-        -o Dpkg::Options::="--force-confold" upgrade && \
-    apt-get -y install curl && \
-    curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
+        -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" upgrade && \
     apt-get -y install \
-        bison \
-        ccache \
-        cmake \
-        doxygen \
-        flex \
-        g++ \
-        gfortran \
-        git \
-        git-lfs \
-        graphviz \
-        libboost-filesystem-dev \
-        libboost-iostreams-dev \
-        libboost-math-dev \
-        libboost-program-options-dev \
-        libboost-system-dev \
-        libboost-thread-dev \
-        libboost-timer-dev \
-        libeigen3-dev \
-        libfreetype6-dev \
-        liblapack-dev \
-        libmpich-dev \
-        libopenblas-dev \
-        libpcre3-dev \
-        libpng-dev \
-        libhdf5-mpich-dev \
-        libgmp-dev \
-        libcln-dev \
-        libmpfr-dev \
-        man \
-        mpich \
-        nano \
-        pkg-config \
-        wget \
-        bash-completion && \
-    git lfs install && \
+                       git \
+                       gcc \
+                       g++ \
+                       gfortran \
+                       cmake \
+                       openmpi-bin \
+                       libopenmpi-dev \
+                       flex \
+                       libblas-dev \
+                       liblapack-dev \
+                       swig3.0 \
+                       libeigen3-dev \
+                       libboost-dev \
+                       libboost-filesystem-dev \
+                       libboost-program-options-dev \
+                       libboost-iostreams-dev \
+                       libboost-timer-dev \
+                       libvtk7-dev \
+                       libvtk7-java \
+                       libvtk7-qt-dev \
+                       libhdf5-openmpi-dev \
+                       gmsh \
+                       environment-modules && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install Python3 based environment
-RUN apt-get -qq update && \
+# enable environment modules
+COPY bash.enable-modules /etc/bash.enable-modules
+RUN cat /etc/bash.enable-modules >> /etc/profile
+
+# install all python dependencies
+RUN apt-get update && \
     apt-get -y --with-new-pkgs \
-        -o Dpkg::Options::="--force-confold" upgrade && \
+        -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" upgrade && \
     apt-get -y install \
-        python3-dev \
-        python3-flufl.lock \
-        python3-numpy \
-        python3-ply \
-        python3-pytest \
-        python3-scipy \
-        python3-tk \
-        python3-urllib3 && \
+                       python \
+                       python-numpy \
+                       python3-scipy \
+                       python3-matplotlib \
+                       python-ply \
+                       python-pytest \
+                       python-setuptools \
+                       python3-vtk7 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Install setuptools
-RUN wget https://bootstrap.pypa.io/get-pip.py && \
-    python3 get-pip.py && \
-    pip3 install --no-cache-dir setuptools && \
-    rm -rf /tmp/*
 
 # Install PETSc from source
 RUN apt-get -qq update && \
@@ -120,55 +122,91 @@ RUN apt-get -qq update && \
      make install && \
      rm -rf /tmp/*
 
-# Install SLEPc from source
-# NOTE: Had issues building SLEPc from source tarball generated by bitbucket.
-# Website tarballs work fine, however.
-RUN apt-get -qq update && \
-    apt-get -y install \
-        python-minimal && \
-    wget -nc --quiet https://gitlab.com/slepc/slepc/-/archive/v${SLEPC_VERSION}/slepc-v${SLEPC_VERSION}.tar.gz -O slepc-${SLEPC_VERSION}.tar.gz && \
-    mkdir -p slepc-src && tar -xf slepc-${SLEPC_VERSION}.tar.gz -C slepc-src --strip-components 1 && \
-    export PETSC_DIR=/usr/local/petsc-32 && \
-    cd slepc-src && \
-    ./configure --prefix=/usr/local/slepc-32 && \
-    make SLEPC_DIR=$(pwd) && \
-    make install && \
+# install an environment module for petsc
+COPY petsc.configmodule /usr/local/share/environment-modules/petsc
+
+# download and install all the fenics components from source
+ENV FENICS_PREFIX /usr/local/fenics
+RUN mkdir -p $FENICS_PREFIX/lib/python2.7/site-packages
+# ufl
+RUN export PYTHONPATH=$FENICS_PREFIX/lib/python2.7/site-packages && \
+    git clone -b tferma-master -q https://bitbucket.org/tferma/ufl.git && \
+    cd ufl && \
+    python setup.py install --prefix=$FENICS_PREFIX && \
     rm -rf /tmp/*
-
-# By default use the 32-bit build of SLEPc and PETSc.
-ENV SLEPC_DIR=/usr/local/slepc-32 \
-    PETSC_DIR=/usr/local/petsc-32
-
-# Install jupyterlab, sympy, mpi4py, petsc4py, slepc4py and pybind11 from source.
-RUN pip3 install --no-cache-dir jupyter jupyterlab matplotlib sympy==1.1.1 pkgconfig && \
-    pip3 install --no-cache-dir https://github.com/mpi4py/mpi4py/archive/${MPI4PY_VERSION}.tar.gz && \
-    pip3 install --no-cache-dir https://bitbucket.org/petsc/petsc4py/downloads/petsc4py-${PETSC4PY_VERSION}.tar.gz && \
-    pip3 install --no-cache-dir https://bitbucket.org/slepc/slepc4py/downloads/slepc4py-${SLEPC4PY_VERSION}.tar.gz && \
-    pip3 install --no-cache-dir pybind11==${PYBIND11_VERSION} && \
-    wget -nc --quiet https://github.com/pybind/pybind11/archive/v${PYBIND11_VERSION}.tar.gz && \
-    tar -xf v${PYBIND11_VERSION}.tar.gz && \
-    cd pybind11-${PYBIND11_VERSION} && \
+# fiat
+RUN export PYTHONPATH=$FENICS_PREFIX/lib/python2.7/site-packages && \
+    git clone -b tferma-master -q https://bitbucket.org/tferma/fiat.git && \
+    cd fiat && \
+    python setup.py install --prefix=$FENICS_PREFIX && \
+    rm -rf /tmp/*
+# dijitso
+RUN export PYTHONPATH=$FENICS_PREFIX/lib/python2.7/site-packages && \
+    git clone -b tferma-master -q https://bitbucket.org/tferma/dijitso.git && \
+    cd dijitso && \
+    python setup.py install --prefix=$FENICS_PREFIX && \
+    rm -rf /tmp/*
+# instant
+RUN export PYTHONPATH=$FENICS_PREFIX/lib/python2.7/site-packages && \
+    git clone -b tferma-master -q https://bitbucket.org/tferma/instant.git && \
+    cd instant && \
+    python setup.py install --prefix=$FENICS_PREFIX && \
+    rm -rf /tmp/*
+# ffc
+RUN export PYTHONPATH=$FENICS_PREFIX/lib/python2.7/site-packages && \
+    git clone -b tferma-master -q https://bitbucket.org/tferma/ffc.git && \
+    cd ffc && \
+    python setup.py install --prefix=$FENICS_PREFIX && \
+    rm -rf /tmp/*
+# dolfin
+RUN export PYTHONPATH=$FENICS_PREFIX/lib/python2.7/site-packages && \
+    export PETSC_DIR=$PETSC_PREFIX && \
+    export PATH=$FENICS_PREFIX/bin:$PATH && \
+    git clone -b tferma-master -q https://bitbucket.org/tferma/dolfin.git && \
+    cd dolfin && \
     mkdir build && \
     cd build && \
-    cmake -DPYBIND11_TEST=False ../ && \
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DDOLFIN_ENABLE_CHOLMOD:BOOL=OFF \
+          -DDOLFIN_ENABLE_UMFPACK:BOOL=OFF \
+          -DDOLFIN_ENABLE_TRILINOS:BOOL=OFF \
+          -DDOLFIN_ENABLE_SLEPC:BOOL=OFF  \
+          -DMETIS_LIBRARY=${PETSC_DIR}/lib/libmetis.so \
+          -DPARMETIS_INCLUDE_DIRS=${PETSC_DIR}/include \
+          -DPARMETIS_LIBRARY=${PETSC_DIR}/lib/libparmetis.so \
+          -DDOLFIN_ENABLE_TESTING:BOOL=OFF \
+          -DCMAKE_INSTALL_PREFIX=${FENICS_PREFIX} \
+          ../. && \
     make && \
     make install && \
     rm -rf /tmp/*
 
-# Our helper scripts
-WORKDIR $FENICS_HOME
-COPY fenics.env.conf $FENICS_HOME/fenics.env.conf
-COPY bin $FENICS_HOME/bin
-RUN PYTHON3_SITE_DIR=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
-    PYTHON3_VERSION=$(python3 -c 'import sys; print(str(sys.version_info[0]) + "." + str(sys.version_info[1]))') && \
-    echo "$FENICS_HOME/local/lib/python$PYTHON3_VERSION/site-packages" >> $PYTHON3_SITE_DIR/fenics-user.pth && \
-    chown -R fenics:fenics $FENICS_HOME
+# install an environment module for fenics
+COPY fenics.configmodule /usr/local/share/environment-modules/fenics
 
+# install spud and some more dependencies
+RUN apt-add-repository ppa:fluidity-core/ppa && \
+    apt-get update -qq && \
+    apt-get install -y \
+                       libatk-adaptor \
+                       libcanberra-gtk-dev \
+                       libgail-dev \
+                       libspud-dev \
+                       diamond \
+                       python-spud \
+                       spudtools && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# supress some spurious gtk errors
+ENV NO_AT_BRIDGE 1
+
+WORKDIR $FENICS_HOME
+
+# load modules at startup
 USER fenics
-RUN echo 'source ~/.profile' >> $FENICS_HOME/.bash_profile && \
-    echo '. ~/fenics.env.conf' >> $FENICS_HOME/.profile && \
-    mkdir -p $FENICS_HOME/.config/matplotlib
-COPY matplotlibrc $FENICS_HOME/.config/matplotlib/matplotlibrc
+COPY bash.load-modules $FENICS_HOME/.bash.load-modules
+RUN cat $FENICS_HOME/.bash.load-modules >> $FENICS_HOME/.profile
 COPY WELCOME $FENICS_HOME/WELCOME
 
 USER root
