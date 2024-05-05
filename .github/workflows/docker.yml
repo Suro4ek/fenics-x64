@@ -18,6 +18,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
+          platforms: linux/arm64
           push: true
           tags: suro4ek/fenics-base:2.0
           file: dockerfiles/base/Dockerfile
