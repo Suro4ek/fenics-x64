@@ -65,7 +65,8 @@ WORKDIR /tmp
 
 RUN apt-get -y install \
                 python3 \
-                fenics
+                fenics \
+                gmsh
 # install all python dependencies
 RUN apt-get -y install \
                    python3-pip \

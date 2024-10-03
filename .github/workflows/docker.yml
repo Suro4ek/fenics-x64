@@ -25,6 +25,6 @@ jobs:
           context: ./dockerfiles/base
           platforms: linux/amd64
           push: true
-          tags: suro4ek/fenics-x64:1.0
+          tags: suro4ek/fenics-x64:1.1
           cache-from: type=gha
           cache-to: type=gha,mode=max
