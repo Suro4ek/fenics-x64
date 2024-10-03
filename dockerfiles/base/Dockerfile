@@ -1,4 +1,4 @@
-FROM ubuntu:lunar
+FROM ubuntu:focal
 
 # Get Ubuntu updates
 USER root

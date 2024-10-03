@@ -23,8 +23,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./dockerfiles/base
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
-          tags: suro4ek/fenics-base:2.0
+          tags: suro4ek/fenics-x64:1.0
           cache-from: type=gha
           cache-to: type=gha,mode=max
