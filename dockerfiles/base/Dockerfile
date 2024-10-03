@@ -2,7 +2,7 @@ FROM ubuntu:focal
 
 # Get Ubuntu updates
 USER root
-RUN apt-get update && \
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get update && \
     apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
     apt-get -y install locales sudo && \
     echo "C.UTF-8 UTF-8" > /etc/locale.gen && \
