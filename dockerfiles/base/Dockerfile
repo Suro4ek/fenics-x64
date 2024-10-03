@@ -81,8 +81,6 @@ RUN apt-get clean && \
   rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 USER root
-COPY set_xvfb.sh /home/fenics/
-RUN chmod 777 /home/fenics/set_xvfb.sh
 COPY pip.conf /home/fenics/.config/pip/
 USER fenics
 ENV FENICS_HOME /home/fenics
