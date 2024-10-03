@@ -2,7 +2,9 @@ FROM ubuntu:focal
 
 # Get Ubuntu updates
 USER root
-RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get update && \
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+RUN apt-get update && \
     apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
     apt-get -y install locales sudo && \
     echo "C.UTF-8 UTF-8" > /etc/locale.gen && \
@@ -94,6 +96,3 @@ COPY WELCOME $FENICS_HOME/WELCOME
 WORKDIR /home/fenics
 USER fenics
 
-RUN /home/fenics/set_xvfb.sh
-ENTRYPOINT ["/bin/bash","-l","-c"]
-CMD ["/bin/bash","-i"]
